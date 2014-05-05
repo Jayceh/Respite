@@ -333,5 +333,28 @@ sub __hello {
 }
 
 ###----------------------------------------------------------------###
+__END__
+
+=head1 RESPITE
+
+Respite Perl Server
+
+=head1
+
+Representational State (Perl Iscool) Transfer Engine
+
+=over 4
+
+=item DESCRIPTION
+
+a short period of rest or relief from something difficult or unpleasant. (notice the short period of rest)
+
+=item LICENSE
+
+Licensed under the same terms as Perl itself
+
+=back
+
+=cut
 
 1;
