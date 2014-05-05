@@ -9,6 +9,8 @@ use JSON ();
 use Scalar::Util qw(blessed weaken);
 use Time::HiRes ();
 use Throw qw(throw);
+use vars qw($VERSION);
+$VERSION = 0.1;
 
 our $max_recurse = 10;
 my $JSON;
@@ -79,7 +81,7 @@ sub DESTROY {}
 sub api_meta {
     my $self = shift;
     my $ref  = ref $self;
-    no strict 'refs';
+    no strict 'refs'; ## no critic
     return ${"${ref}::api_meta"} if ${"${ref}::api_meta"};
     return $self->{'api_meta'} ||= ($ref eq __PACKAGE__ ? throw "No api_meta defined", {class => $self, type => 'no_meta'} : {});
 }
@@ -171,7 +173,7 @@ sub find_method {
         return $cache->{$meth} = $code if $code = $self->can($meth) and $code ne \&{__PACKAGE__."::$meth"};
         return $cache->{$meth} = $code if $code = $self->can("__$meth");
     } elsif (!$cache->{'--load--'}->{'builtin'}++) {
-        no strict 'refs';
+        no strict 'refs'; ## no critic
         my @search = ref($self);
         while (my $pkg = shift @search) {
             unshift @search, @{"${pkg}::ISA"} if $pkg ne __PACKAGE__;
@@ -206,7 +208,7 @@ sub find_method {
             # TODO - faster lookup if we know the method
             my $qr = $opt->{'match'} || 1;
             $qr = ($qr eq '1' || $qr eq '*') ? qr{.} : qr{^$qr} if $qr && !ref $qr;
-            no strict 'refs';
+            no strict 'refs'; ## no critic
             for my $meth (keys %{"${pkg}::"}) {
                 next if ! defined &{"${pkg}::$meth"};
                 next if ($pkg eq __PACKAGE__) ? $meth !~ /^__/ : defined &{__PACKAGE__."::$meth"};
@@ -283,7 +285,7 @@ sub __methods__meta {
 
 sub __methods {
     my ($self, $args) = @_;
-    no strict 'refs';
+    no strict 'refs'; ## no critic
     my $pkg  = ref($self) || $self;
     my %m;
     my $qr = !$args->{'method'} ? undef : do { (my $p = $args->{'method'}) =~ s/\*/.*/g; qr/^$p$/i };

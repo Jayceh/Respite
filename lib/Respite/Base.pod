@@ -2,8 +2,6 @@
 
 Respite::Base - base class for Respite related modules that can be used from a server or commandline
 
-$Id: Base.pod,v 1.10 2013/10/04 21:44:19 paul Exp $
-
 =head1 SYNOPSIS
 
     package Foo;
