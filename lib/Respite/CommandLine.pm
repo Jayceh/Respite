@@ -206,7 +206,11 @@ sub _pod {
     if (!$args->{'format'} || ($args->{'format'} && $args->{'format'} =~ /h/)) {
         require Pod::Text;
         require IO::String;
-        my $cols = $ENV{'COLUMNS'} || eval { die if ! -t STDOUT; require Term::ReadKey; (Term::ReadKey::GetTerminalSize(\*STDOUT))[0] } || 80;
+        my $cols = $ENV{'COLUMNS'} || eval {
+                                        require IO::Interactive;
+                                        die if ! IO::Interactive::is_interactive(*STDOUT);
+                                        require Term::ReadKey; (Term::ReadKey::GetTerminalSize(\*STDOUT))[0]
+                                      } || 80;
         Pod::Text->new(width => $cols)->parse_from_file(IO::String->new($out), IO::String->new(my $txt));
         return $txt;
     }
