@@ -348,6 +348,8 @@ sub __hello {
     };
 }
 
+1;
+
 ###----------------------------------------------------------------###
 __END__
 
@@ -372,5 +374,3 @@ Licensed under the same terms as Perl itself
 =back
 
 =cut
-
-1;
