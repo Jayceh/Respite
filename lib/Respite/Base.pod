@@ -160,7 +160,7 @@ transport.)
 Can be one of new, cache, or morph.  Default is new.  When "new"
 is selected, a new object will be created with each dispatch call and
 it will contain a reference to the parent in the key named "base".  When
-"cached" is selected, a cached object will be used - the object is cached
+"cache" is selected, a cached object will be used - the object is cached
 inside of the base object.  When "morph is
 selected, rather than creating a new object, the base object is temporarily
 blessed into the new object class.
