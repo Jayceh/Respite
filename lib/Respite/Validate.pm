@@ -223,6 +223,14 @@ sub validate_buddy {
         return @errors ? \@errors : 0;
     }
 
+    # allow for canonical field name (allows api to present one field name but return a different one)
+    # need to do this relatively early since we are changing the value of $field
+    if ($fv->{'canonical'}) {
+        my $orig = $fv->{'orig_field'} = $field;
+        $field = $fv->{'canonical'};
+        $form->{$field} = delete $form->{$orig};
+    }
+
     if ($fv->{'was_valid'}   && ! $self->{'was_valid'}->{$field})   { return [[$field_prefix.$field, 'was_valid',   $fv, $ifs_match]]; }
     if ($fv->{'had_error'}   && ! $self->{'had_error'}->{$field})   { return [[$field_prefix.$field, 'had_error',   $fv, $ifs_match]]; }
     if ($fv->{'was_checked'} && ! $self->{'was_checked'}->{$field}) { return [[$field_prefix.$field, 'was_checked', $fv, $ifs_match]]; }
