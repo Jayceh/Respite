@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use Test::More qw(no_plan);
+use End;
 use Throw qw(throw);
 use Respite::Base;
 use JSON ();
@@ -10,7 +11,7 @@ use JSON ();
 use End;
 use File::Path qw(rmtree);
 my $dir = __FILE__.".testlib";
-#my $end = End->new(sub { rmtree $dir if -e $dir });
+my $end = end { rmtree $dir if -e $dir };
 mkdir $dir, or warn "Could not mkdir $dir: $!";
 open my $fh, '>', "$dir/MyMod.pm" or throw "Could not write $dir/MyMod.pm: $!";
 print $fh "package MyMod; use base 'Respite::Base'; sub __voom { return {VOOM => 1} }\n1;\n";
