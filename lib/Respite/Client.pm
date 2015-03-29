@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use IO::Socket::SSL ();
 use JSON ();
-use Time::HiRes ();
+use Time::HiRes qw(sleep);
 use Digest::MD5 qw(md5_hex);
 
 our $config;
@@ -79,7 +79,7 @@ sub config {
 sub api_brand {
     my ($self, $name) = @_;
     $name ||= $self->service_name;
-    return undef if $self->config(no_brand => undef, $name);
+    return undef if $self->config(no_brand => undef, $name); ## no critic (ProhibitExplicitReturnUndef)
     $self->config(brand => sub { eval { config::provider() } || $self->_configs->{'provider'} || do { warn "Missing $name brand"; '-' } }, $name);
 }
 
@@ -118,7 +118,7 @@ sub _remote_call {
             $sock = $no_ssl ? IO::Socket::INET->new("$host:$port")
                            : IO::Socket::SSL->new("$host:$port");
             last if $sock || !$retry || (Time::HiRes::time() - $begin > 3);
-            select undef, undef, undef, .5;
+            sleep 0.5;
         }
         throw "Could not connect to $name service", {host => $host, port => $port, url => $url, msg => "$!", detail => "$@", ssl => !$no_ssl, tries => $i} if ! $sock;
 
@@ -202,7 +202,7 @@ sub AUTOLOAD {
     throw "Self was not passed while looking up method", {method => $meth, trace => 1} if ! ref $self;
     throw "Invalid ".$self->service_name." method \"$meth\"", {trace => 1} if !$self->_needs_remote($meth) && ! $self->can("__${meth}");
     my $code = sub { $_[0]->run_method($meth => $_[1]) };
-    no strict 'refs';
+    no strict 'refs'; ## no critic
     *{ref($self)."::$meth"} = $code if __PACKAGE__ ne ref($self);
     return $self->$code($args);
 }

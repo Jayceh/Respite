@@ -5,6 +5,7 @@ use warnings;
 use Test::More;
 use POSIX qw(tmpnam);
 use Throw qw(throw import);
+use Time::HiRes qw(sleep);
 use End;
 #use Data::Debug;
 
@@ -109,7 +110,7 @@ sub setup_test_server {
     # block the parent (that will run client tests) until the child running the server is fully setup
     my $connected;
     for (1 .. 30) {
-        select undef, undef, undef, .1;
+        sleep 0.1;
         my $class = 'IO::Socket::INET';
         if (!$no_ssl) {
             require IO::Socket::SSL;
