@@ -22,6 +22,7 @@ sub new {
     return bless $args || {}, $class;
 }
 
+sub SHARE {}
 
 sub _configs { $config || (eval { require config } or $config::config{'failed_load'} = $@) && config->load }
 
