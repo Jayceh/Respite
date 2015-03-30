@@ -7,6 +7,7 @@ use warnings;
 use JSON ();
 use Digest::MD5 qw(md5_hex);
 use Throw qw(throw);
+use Time::HiRes qw(sleep);
 
 our $config;
 
@@ -446,7 +447,7 @@ sub run { throw "Use either run_server or run_commandline for clarity" }
 
 sub run_commandline {
     my $class = shift;
-    my $sub = "__$ARGV[0]" if $ARGV[0] && $class->can("__$ARGV[0]");
+    my $sub = $ARGV[0] && $class->can("__$ARGV[0]") ? "__$ARGV[0]" : undef;
     shift(@ARGV) if $sub;
 
     if ($ENV{'BOUND_SOCKETS'}) { # HUP
@@ -555,7 +556,7 @@ sub __stop {
     }
     for (1 .. 25) {
         return _ok(1, "Stopped $name") if !kill 0, $pid;
-        select undef, undef, undef, .2;
+        sleep 0.2;
         require POSIX;
         1 while waitpid(-1, POSIX::WNOHANG()) > 0; # handle rare non-setsid uses of run and _stop
     }

@@ -6,6 +6,7 @@ use Test::More qw(no_plan);
 use End;
 use Throw qw(throw);
 use Respite::Base;
+use Data::Debug qw(debug);
 use JSON ();
 
 use End;
@@ -222,7 +223,7 @@ eval { $obj->bang_child_five() }; # make sure a method has been called so the ca
 $test->(@$_) for (
     [foo => {} => {BAR => 1}],
     [bar => {} => {BAR => 1}],
-    [bad => {} => {error => 'Invalid API method during AUTOLOAD', method => 'bad', class => 'Bam', trace => "Called from (eval) at $file line $sub_line"}],
+    [bad => {} => {error => 'Invalid Respite method during AUTOLOAD', method => 'bad', class => 'Bam', trace => "Called from (eval) at $file line $sub_line"}],
     [foo_child_one => {} => {FOO_CHILD => 1}],
     [bar_child_two => {} => {BAR_CHILD => 1}],
     [baz_child_three => {} => {BAZ_CHILD => 1}],
