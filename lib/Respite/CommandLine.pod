@@ -1,21 +1,21 @@
 =head1 NAME
 
-Repsite::CommandLine - Provide an easy way to get commandline abstraction of Repsite::Base
+Respite::CommandLine - Provide an easy way to get commandline abstraction of Respite::Base
 
 $Id: CommandLine.pod,v 1.4 2013/09/23 19:13:18 paul Exp $
 
 =head1 SYNOPSIS
 
-    use Repsite::CommandLine;
+    use Respite::CommandLine;
 
     # run under a local interface (on the server)
-    Repsite::CommandLine->run({
+    Respite::CommandLine->run({
         api_meta => 'Some::Class',
     });
 
     # Also on the server
-    Repsite::CommandLine->run({
-        api_meta => {  # will use Repsite::Base
+    Respite::CommandLine->run({
+        api_meta => {  # will use Respite::Base
             methods => {
                 foo => sub { return {FOO => 1} },
             },
@@ -24,10 +24,10 @@ $Id: CommandLine.pod,v 1.4 2013/09/23 19:13:18 paul Exp $
 
 
     # run under a remote interface (on a client)
-    use Repsite::CommandLine;
-    Repsite::CommandLine->run({
+    use Respite::CommandLine;
+    Respite::CommandLine->run({
         api_meta => {
-            remote  => 1, # will use Repsite::Client
+            remote  => 1, # will use Respite::Client
             service => 'foo',
             host    => 'localhost',
             brand   => 'test',
@@ -39,7 +39,7 @@ $Id: CommandLine.pod,v 1.4 2013/09/23 19:13:18 paul Exp $
 
 
     # it is also possible to use this as a reusable service in other utilities
-    my $cmdclient = Repsite::CommandLine->new({api_meta => {service => 'dist', port => 50905, host => 'example.com'}});
+    my $cmdclient = Respite::CommandLine->new({api_meta => {service => 'dist', port => 50905, host => 'example.com'}});
     my $data = $cmdclient->run_method(hello => {foo => 1});
 
     # will prompt for password
@@ -52,11 +52,11 @@ $Id: CommandLine.pod,v 1.4 2013/09/23 19:13:18 paul Exp $
 =item api_meta
 
 May be a class name, or a hashref of information necessary for passing
-to Repsite::Base or Repsite::Client.  If it is a classname, it should be
+to Respite::Base or Respite::Client.  If it is a classname, it should be
 capable of handling run_method (typically should be a subclass of
-Repsite::Base).  Otherwise the hashref should conform to the standards for
-Repsite::Base.  If a api_meta contains a true value for "remote", then
-Repsite::Client will be used instead.
+Respite::Base).  Otherwise the hashref should conform to the standards for
+Respite::Base.  If a api_meta contains a true value for "remote", then
+Respite::Client will be used instead.
 
 =back
 

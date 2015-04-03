@@ -139,8 +139,8 @@ sub print_data {
         print "args = ".$json->encode($args);
         print "data = ".$json->encode($data);
     } elsif ($ENV{'PERL'}) {
-        if (eval { require Debug }) {
-            Debug::debug($args, $data);
+        if (eval { require Data::Debug }) {
+             Data::ebug::debug($args, $data);
         } else {
             require Data::Dumper;
             print Data::Dumper::Dumper($_) for $args, $data;
@@ -195,7 +195,7 @@ sub _pod {
             my $args = $m->{'args'}; my %uk;
             foreach my $field (grep {!$uk{$_}++} (map {split /\s*,\s*/} ref($args->{'group order'}) ? @{$args->{'group order'}} : $args->{'group order'}||()), grep {!/^group /} sort keys %$args) {
                 $out .= "=item C<$field>\n\n";
-                Debug::debug($meth, $field, $args->{$field}) if ! ref($args->{$field}) && eval {require Debug};
+                Data::Debug::debug($meth, $field, $args->{$field}) if ! ref($args->{$field}) && eval {require Data::Debug};
                 $out .= "(required)\n\n" if $args->{$field}->{'required'};
                 $out .= "$args->{$field}->{'desc'}\n\n" if $args->{$field}->{'desc'};
             }

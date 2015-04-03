@@ -7,7 +7,7 @@ $Id: Client.pod,v 1.5 2014/02/26 19:30:38 dfackrell Exp $
 =head1 SYNOPSIS
 
     use Respite::Client;
-    use Debug;
+    use Data::Debug;
 
     my $client = Respite::Client->new({
         service => 'foo',        # typically all that is required
@@ -113,7 +113,7 @@ and headers will be output to STDERR via warn.
     export DEBUG_Respite=1
 
     # bare request
-    PROV=company_brand perl -Ilib -e 'use config; use Respite::Client; $c=Respite::Client->new({service => "service_name",no_sign=>1,no_trace=>1}); use Debug; debug $c->hello'
+    PROV=company_brand perl -Ilib -e 'use config; use Respite::Client; $c=Respite::Client->new({service => "service_name",no_sign=>1,no_trace=>1}); use Data::Debug; debug $c->hello'
     DEBUG_Respite: Connected to https://localhost:50901/
     POST /service_name/hello/company_brand HTTP/1.0
     Host: localhost
@@ -124,7 +124,7 @@ and headers will be output to STDERR via warn.
 
 
     # with caller trace
-    PROV=company_brand perl -Ilib -e 'use config; use Respite::Client; $c=Respite::Client->new({service => "service_name",no_sign=>1}); use Debug; debug $c->hello'
+    PROV=company_brand perl -Ilib -e 'use config; use Respite::Client; $c=Respite::Client->new({service => "service_name",no_sign=>1}); use Data::Debug; debug $c->hello'
 
     DEBUG_Respite: Connected to https://localhost:50901/
     POST /service_name/hello/company_brand HTTP/1.0
@@ -136,7 +136,7 @@ and headers will be output to STDERR via warn.
 
 
     # with method signing
-    PROV=company_brand perl -Ilib -e 'use config; use Respite::Client; $c=Respite::Client->new({service => "service_name"}); use Debug; debug $c->hello'
+    PROV=company_brand perl -Ilib -e 'use config; use Respite::Client; $c=Respite::Client->new({service => "service_name"}); use Data::Debug; debug $c->hello'
     DEBUG_Respite: Connected to https://localhost:50901/
     POST /service_name/hello/company_brand HTTP/1.0
     X-Respite-Auth: 28b771585f523c91ad555d7a956f0940:1368823114
