@@ -140,7 +140,7 @@ sub print_data {
         print "data = ".$json->encode($data);
     } elsif ($ENV{'PERL'}) {
         if (eval { require Data::Debug }) {
-             Data::ebug::debug($args, $data);
+             Data::Debug::debug($args, $data);
         } else {
             require Data::Dumper;
             print Data::Dumper::Dumper($_) for $args, $data;
