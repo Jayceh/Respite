@@ -35,7 +35,7 @@ Respite::Base - base class for Respite related modules that can be used from a s
                 foo => 'bar', # alias a method
                 baz => sub { }, # custom
             },
-            namespace => {
+            namespaces => {
                 foo_child => 1,
                 bar_child => 1,
             },
@@ -68,7 +68,7 @@ Respite::Base - base class for Respite related modules that can be used from a s
             methods => {
                 foo => 'bar',
             },
-            namespace => {
+            namespaces => {
                 Foo => {},
             },
         },
