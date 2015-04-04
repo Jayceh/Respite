@@ -28,7 +28,7 @@ sub _configs { $config || (eval { require config } or $config::config{'failed_lo
 
 sub config {
     my ($self, $key, $def, $name) = @_;
-    $name ||= (my $n = lc $self->base_class || ref($self) || $self || '') =~ /(\w+)$/ ? lc $1 : '';
+    $name ||= (my $n = $self->base_class || ref($self) || $self || '') =~ /(\w+)$/ ? lc $1 : '';
     my $c = $self->_configs($name);
     return exists($self->{$key}) ? $self->{$key}
         : exists($c->{"${name}_service_${key}"}) ? $c->{"${name}_service_${key}"}
