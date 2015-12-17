@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use Test::More qw(no_plan);
+use Test::Deep;
 use JSON ();
 use Throw qw(throw);
 use Respite::Base;
@@ -288,3 +289,13 @@ nest_a_hello
 nest_a_methods
 nest_a_nest_b_foo
 )], "Correct nested setup");
+
+
+my $ip = '127.0.0.1';
+$obj = Bam->new({api_ip => $ip});
+$out = eval { $obj->hello } || diag "$@";
+Test::Deep::cmp_deeply(
+    $out,
+    { api_brand => undef, api_ip => $ip, args => { }, server_time => Test::Deep::ignore() },
+    'Call hello method'
+);
