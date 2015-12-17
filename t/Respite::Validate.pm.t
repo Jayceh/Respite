@@ -1,9 +1,10 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 use strict;
 use warnings;
-use Test::More tests => 232;
+use Test::More tests => 267;
 
+use FindBin qw($Bin);
 use_ok('Respite::Validate');
 
 my $v;
@@ -405,6 +406,9 @@ $e = validate({foo => 'bi-ng.com'}, $v);
 ok(! $e, 'type domain');
 $e = validate({foo => '123456789012345678901234567890123456789012345678901234567890123.com'}, $v);
 ok(! $e, 'type domain');
+$e = validate({foo => 'xn--80aaaaaicw7bh5btdcjqe.xn--p1ai'}, $v);
+ok(! $e, 'type domain');
+
 
 $e = validate({foo => 'com'}, $v);
 ok($e, 'type domain');
@@ -416,9 +420,11 @@ $e = validate({foo => '123456789012345678901234567890123456789012345678901234567
 ok($e, 'type domain');
 
 ok(!validate({n => $_}, {n => {type => 'num'}}),  "Type num $_")  for qw(0 2 23 -0 -2 -23 0.0 .1 0.1 0.10 1.0 1.01);
+ok(!validate({n => $_}, {n => {type => 'unum'}}), "Type unum $_") for qw(0 2 23 0.0 .1 0.1 0.10 1.0 1.01);
 ok(!validate({n => $_}, {n => {type => 'int'}}),  "Type int $_")  for qw(0 2 23 -0 -2 -23 2147483647 -2147483648);
 ok(!validate({n => $_}, {n => {type => 'uint'}}), "Type uint $_") for qw(0 2 23 4294967295);
 ok(validate({n => $_}, {n => {type  => 'num'}}),  "Type num invalid $_")  for qw(0a a2 -0a 0..0 00 001 1.);
+ok(validate({n => $_}, {n => {type  => 'unum'}}), "Type unum invalid $_") for qw(0a a2 -0a 0..0 00 001 1. -5 -3.14);
 ok(validate({n => $_}, {n => {type  => 'int'}}),  "Type int invalid $_")  for qw(1.1 0.1 0.0 -1.1 0a a2 a 00 001 2147483648 -2147483649);
 ok(validate({n => $_}, {n => {type  => 'uint'}}), "Type uint invalid $_") for qw(-1 -0 1.1 0.1 0.0 -1.1 0a a2 a 00 001 4294967296);
 
@@ -502,6 +508,22 @@ ok($e);
 $e = validate({bar => "bar"}, $v);
 ok($e);
 
+$v = {
+  'group no_extra_fields' => 1,
+  foo => {max_values=>20,type=>{recursion=>{max_len=>10}}},
+};
+
+$e = validate({foo => { recursion => 1 }}, $v);
+ok(!$e);
+
+$e = validate({foo => [{},{},{ recursion => 1 }]}, $v);
+ok(!$e) or note explain $e;
+
+$e = validate({foo => { bar => 1 }}, $v);
+ok($e);
+
+$e = validate({foo => [{},{},{ bar => 1 }]}, $v);
+ok($e);
 
 ### test on failed validate if
 $v = {
@@ -541,6 +563,27 @@ ok($e);
 
 $e = validate({baz => 1, bar => "bar"}, $v);
 ok($e);
+
+### test on type field
+$v = {
+  'group no_extra_fields' => 1,
+  foo => { },
+};
+
+$e = validate({foo => { bar => 1 }}, $v);
+ok(! $e, 'No error when supplying a hashref when type is not defined') or note explain $e;
+
+### test on type field
+$v = {
+  'group no_extra_fields' => 1,
+  foo => { type => { bar => { max_len => 10 } } },
+};
+
+$e = validate({foo => { bar => 1 }}, $v);
+ok(! $e, 'No error when supplying a hashref when type is defined as hashref') or note explain $e;
+
+$e = validate({foo => { baz => 1 }}, $v);
+ok($e, 'Error when supplying an extra field inside a hashref when type is defined as hashref');
 
 
 
@@ -611,13 +654,14 @@ is($form->{'key3'}, '23', "Non-global is fine");
 
 $v = {
     foo => {
+        validate_if => 'foo',
         type => {
             baz => {required => 1}, # required only if "foo" exists
         },
     },
 };
 $e = validate({}, $v);
-ok(! $e, "Type hash, optional check");
+ok(! $e, "Type hash, optional check") || debug $e;
 
 $e = validate({foo => 1}, $v);
 is_deeply($e, {foo => 'foo did not match type hash.'}, "Type hash, type check");
@@ -650,3 +694,66 @@ is_deeply($e, {'foo' => 'foo had more than 2 values.'}, "Type hash, over max_val
 
 $e = validate({foo => [{baz => 1},{fail=>1}]}, $v);
 is_deeply($e, {'foo.baz' => 'foo.baz is required.'}, "Type hash, inner required check");
+
+
+$v = {
+    foo => {
+        type => {
+            baz => {
+                max_values => 2,
+                type => {
+                    bar => {},
+                },
+            },
+        },
+    },
+};
+$e = validate({foo => {baz => [{},{}]}}, $v);
+ok(! $e, "Type hash, nested array 2 elements ok");
+
+$e = validate({foo => {baz => [{},{},{}]}}, $v);
+ok($e, "Type hash, nested array 3 elements, over max_values");
+
+
+$v = {
+    foo => {
+        max_values => 3,
+        type => {
+            baz => {
+                required => 1, # required only if "foo" exists
+                default => '2',
+            },
+        },
+        #validate_if => 'foo', #added later
+    },
+};
+
+$form = {foo => [{baz => 1},{}]};
+$e = validate($form, $v);
+ok(! $e, "Type hash, array 2 elements ok");
+is_deeply($form, { 'foo' => [ { 'baz' => 1 }, { 'baz' => '2' } ] }, 'defaults set without validate_if');
+
+$v->{foo}{validate_if} = 'foo';
+
+$form = { foo => [ {} ] };
+$e = validate($form, $v);
+ok(!$e, "Type hash, array 1 elements ok");
+is_deeply($form, { 'foo' => [ { 'baz' => '2' } ] }, 'default works with validate_if');
+
+$form = { foo => [ {baz=>1}, {x=>1}, {} ] };
+$e = validate($form, $v);
+ok(!$e, "Type hash, array 3 elements ok");
+is_deeply($form, { 'foo' => [ {baz=>1}, {x=>1,baz=>2}, {baz=>2} ] }, 'defaults set with validate_if containing an array of multiple values');
+
+
+$v = {
+    'group no_extra_fields' => 1,
+    foo => {
+        max_values => 3,
+        type => 'uint',
+    },
+};
+
+$form = {foo => [3]};
+$e = validate($form, $v);
+ok(! $e, "Verify no_extra_fields works on non-hash data inside an array") or note explain $e;

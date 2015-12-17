@@ -1,7 +1,7 @@
-use strict;
-use warnings;
 package Respite::AutoDoc;
 
+use strict;
+use warnings;
 use CGI::Ex::App qw(:App);
 use base qw(CGI::Ex::App);
 

@@ -79,13 +79,7 @@ sub validate {
     }
     push(@errors, @$hold_error) if $hold_error; # allow for final OR to work
 
-    if ($ARGS->{'no_extra_fields'} || $self->{'no_extra_fields'}) {
-        my %keys = map { ($_->{'field'} => 1) } @$fields;
-        foreach my $key (sort keys %$form) {
-            next if $keys{$key};
-            push @errors, [$key, 'no_extra_fields', {}, undef];
-        }
-    }
+    $self->no_extra_fields($form,$fields,$val_hash,\@errors) if ($ARGS->{'no_extra_fields'} || $self->{'no_extra_fields'});
 
     return if ! @errors; # success
 
@@ -104,6 +98,42 @@ sub validate {
     chomp $error{$_} for keys %error;
     throw "Validation failed", {errors => \%error} if $ARGS->{'raise_error'};
     return \%error;
+}
+
+sub no_extra_fields {
+    my ($self,$form,$fields,$fv,$errors,$field_prefix) = @_;
+    $field_prefix ||= '';
+    local $self->{'_recurse'} = ($self->{'_recurse'} || 0) + 1;
+    throw "Max dependency level reached 10" if $self->{'_recurse'} > 10;
+
+    my %keys = map { ($_->{'field'} => 1) } @$fields;
+    foreach my $key (sort keys %$form) {
+        if (ref $form->{$key} eq 'HASH') {
+            my $field_type = $fv->{$key}->{'type'};
+            if(!defined $field_type) {
+                # Do nothing
+            }
+            elsif (ref $field_type ne 'HASH') {
+                push @$errors, [$field_prefix.$key, 'no_extra_fields', {}, undef];
+                next;
+            } else {
+                my $f = [map { {field=>$_} } keys %$field_type];
+                $self->no_extra_fields($form->{$key},$f,$field_type,$errors,$field_prefix.$key.'.');
+            }
+        } elsif (ref $form->{$key} eq 'ARRAY') {
+            my $field_type = $fv->{$key}->{'type'};
+            if (!defined $field_type) {
+                # Do nothing
+            } elsif (ref $field_type eq 'HASH') {
+                my $f = [map { {field=>$_} } keys %$field_type];
+                foreach (my $i = 0; $i <= $#{$form->{$key}}; $i ++) {
+                    $self->no_extra_fields($form->{$key}->[$i],$f,$field_type,$errors,$field_prefix.$key.':'.$i.'.') if ref $form->{$key}->[$i];
+                }
+            }
+        }
+        next if $keys{$key};
+        push @$errors, [$field_prefix.$key, 'no_extra_fields', {}, undef];
+    }
 }
 
 sub get_ordered_fields {
@@ -188,6 +218,9 @@ sub check_conditional {
         # get the field - allow for custom variables based upon a match
         my $field = $ref->{'field'} || throw "Missing field key during validate_if (possibly used a reference to a main hash *foo -> &foo)";
         $field =~ s/\$(\d+)/defined($ifs_match->[$1]) ? $ifs_match->[$1] : ''/eg if $ifs_match;
+
+        # max_values is properly checked elsewhere, however we need to stub in a value so defaults are properly set
+        $ref->{'max_values'} ||= scalar @{$form->{$field}} if ref $form->{$field} eq 'ARRAY';
 
         my $errs = $self->validate_buddy($form, $field, $ref);
 
@@ -346,7 +379,7 @@ sub validate_buddy {
         return [[$field_prefix.$field, 'min_values', $fv, $ifs_match]];
     }
 
-    $fv->{'max_values'} = 1 if ! exists $fv->{'max_values'};
+    $fv->{'max_values'} = $fv->{'min_values'} || 1 if ! exists $fv->{'max_values'};
     $n = $fv->{'max_values'} || 0;
     if ($n_values > $n) {
         return [] if $self->{'_check_conditional'};
@@ -587,6 +620,7 @@ sub validate_buddy {
 sub check_type {
     my ($self, $value, $type) = @_;
     $type = ref($type) eq 'HASH' ? 'hash' : lc $type;
+    return 0 if ! defined $value;
     if ($type eq 'email') {
         return 0 if ! $value;
         my ($local_p,$dom) = ($value =~ /^(.+)\@(.+?)$/) ? ($1,$2) : return 0;
@@ -595,18 +629,18 @@ sub check_type {
         return 0 if ! $self->check_type($dom,'domain') && ! $self->check_type($dom,'ip');
         return 0 if ! $self->check_type($local_p,'local_part');
     } elsif ($type eq 'hash') {
-        return 0 if defined $value && ref $value ne 'HASH';
+        return 0 if ref $value ne 'HASH';
     } elsif ($type eq 'local_part') {
-        return 0 if ! defined($value) || ! length($value);
+        return 0 if ! length($value);
         # ignoring all valid quoted string local parts
         return 0 if $value =~ m/[^\w.~!\#\$%\^&*\-=+?]/;
     } elsif ($type eq 'ip') {
         return 0 if ! $value;
-        return (4 == grep {!/\D/ && $_ < 256} split /\./, $value, 4);
+        return (4 == grep {/^\d+$/ && $_ < 256} split /\./, $value, 4);
     } elsif ($type eq 'domain') {
         return 0 if ! $value || length($value) > 255;
-        return 0 if $value !~ /^([a-z0-9][a-z0-9\-]{0,62} \.)+ [a-z]{1,63}$/ix
-            || $value =~ m/(\.\-|\-\.|\.\.)/;
+        return 0 if $value !~ /^(?:[a-z0-9][a-z0-9\-]{0,62} \.)+ [a-z0-9][a-z0-9\-]{0,62}$/ix
+            || $value =~ m/(?:\.\-|\-\.|\.\.)/;
     } elsif ($type eq 'url') {
         return 0 if ! $value;
         $value =~ s|^https?://([^/]+)||i || return 0;
@@ -624,6 +658,8 @@ sub check_type {
         return 0 if $value > 2**32-1;
     } elsif ($type eq 'num') {
         return 0 if $value !~ /^-? (?: 0 | [1-9]\d* (?:\.\d+)? | 0?\.\d+) $/x;
+    } elsif ($type eq 'unum') {
+        return 0 if $value !~ /^   (?: 0 | [1-9]\d* (?:\.\d+)? | 0?\.\d+) $/x;
     } elsif ($type eq 'cc') {
         return 0 if ! $value;
         return 0 if $value =~ /[^\d\-\ ]/;

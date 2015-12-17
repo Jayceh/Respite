@@ -10,7 +10,7 @@ use Scalar::Util qw(blessed weaken);
 use Time::HiRes ();
 use Throw qw(throw);
 use vars qw($VERSION);
-$VERSION = 0.1;
+$VERSION = 0.2;
 
 our $config;
 our $max_recurse = 10;
