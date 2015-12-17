@@ -61,7 +61,8 @@ sub run {
     $req = Data::URIEncode::flat_to_complex($req) || {} if !$self->{'no_data_uriencode'} && eval { require Data::URIEncode };
 
     my $data = $self->_run_method($obj,$method, $req);
-    $self->print_data($data, $req);
+    my $meta = $ENV{'SHOW_META'} ? $self->_run_method($obj,"${method}__meta", $req) : undef;
+    $self->print_data($data, $req, $meta);
     exit(1) if ref($data) && $data->{'error'};
 }
 
@@ -75,7 +76,7 @@ sub run_method {
 sub _run_method {
     my ($self, $obj, $method, $args, $extra) = @_;
 
-    local $args->{'_c'} = ['commandline'] if !$obj->config(no_trace => undef);
+    local $args->{'_c'} = ['commandline'] if $obj->can('config') ? !$obj->config(no_trace => undef) : 1;
 
     local $obj->{'remote_ip'}   = local $obj->{'api_ip'} = ($ENV{'REALUSER'} || $ENV{'SUDO_USER'}) ? 'sudo' : 'cmdline';
     local $obj->{'api_brand'}   = $ENV{'BRAND'} || $ENV{'PROV'} if $obj->isa('Respite::Base') && ($ENV{'BRAND'} || $ENV{'PROV'});
@@ -85,7 +86,7 @@ sub _run_method {
     $obj->commandline_init($method, $args, $self) if $obj->can('commandline_init');
 
     my $run = sub {
-        my $data = eval { $obj->run_method(@_) };
+        my $data = eval { $obj->can('run_method') ? $obj->run_method(@_) : $obj->$method($args, ($extra ? $extra : ())) };
         $data = $@ if ! ref $data;
         return !ref($data) ? {error => 'Commandline failed', msg => $data} : (blessed($data) && $data->can('data')) ? $data->data : $data;
     };
@@ -97,7 +98,8 @@ sub _run_method {
         eval { require IO::Prompt } || throw "Please install IO::Prompt to authenticate from commandline", {msg => $@};
         my $user = ''.IO::Prompt::prompt("  Web Auth Username: ", -d => $obj->{'remote_user'}) || $obj->{'remote_user'};
         my $pass = ''.IO::Prompt::prompt("  Web Auth Password ($user): ", -e => '*') || throw "Cannot proceed without password";
-        my $key  = $obj->config(plaintext_public_key => sub { $obj->config(plaintext_public_key => sub { $obj->_configs->{'plaintext_public_key'} }, 'emp_auth') });
+        my $key  = !$obj->can('config') ? $config::config{'plaintext_public_key'}
+            : $obj->config(plaintext_public_key => sub { $obj->config(plaintext_public_key => sub { $obj->_configs->{'plaintext_public_key'} }, 'emp_auth') });
         if (!$key) {
             warn "  Could not find plaintext_public_key in config - sending plaintext password\n";
         } elsif (!eval { require Crypt::OpenSSL::RSA }) {
@@ -118,7 +120,7 @@ sub _run_method {
 }
 
 sub print_data {
-    my ($self, $data, $args) = @_;
+    my ($self, $data, $args, $meta) = @_;
     if ($ENV{'CSV'} and my @fields = grep {ref($data->{$_}) eq 'ARRAY' && ref($data->{$_}->[0]) eq 'HASH'} sort keys %$data) {
         require Text::CSV_XS;
         my $csv = Text::CSV_XS->new({eol => "\n"});
@@ -136,6 +138,7 @@ sub print_data {
     } elsif ($ENV{'JSON'} || ! eval { require PrettyTable }) {
         eval { require JSON } || throw "Could not load JSON for output", {msg => $@};
         my $json = JSON->new->utf8->allow_nonref->convert_blessed->pretty->canonical;
+        print "meta = ".$json->encode($meta) if $ENV{'SHOW_META'};
         print "args = ".$json->encode($args);
         print "data = ".$json->encode($data);
     } elsif ($ENV{'PERL'}) {
@@ -143,9 +146,13 @@ sub print_data {
              Data::Debug::debug($args, $data);
         } else {
             require Data::Dumper;
-            print Data::Dumper::Dumper($_) for $args, $data;
+            print Data::Dumper::Dumper($_) for $ENV{'SHOW_META'} ? $meta : (), $args, $data;
         }
     } else {
+        if ($ENV{'SHOW_META'}) {
+            print "Meta:\n";
+            print PrettyTable->plain_text($meta, {auto_collapse => 1});
+        }
         print "Arguments:\n";
         print PrettyTable->plain_text($args, {auto_collapse => 1});
         if ((scalar(keys %$data) == 1 || $data->{'n_pages'} && $data->{'n_pages'} == 1) && $data->{'rows'}) {
@@ -178,7 +185,8 @@ sub _pod {
         ."    JSON=1 $script $meth key1 value1 key2 value2\n\n"
         ."    YAML=1 $script $meth key1 value1 key2 value2\n\n"
         ."    PERL=1 $script $meth key1 value1 key2 value2\n\n"
-        ."    CSV=1 $script $meth key1 value1 key2 value2\n\n (only works for fields that are arrays of hashes)"
+        ."    CSV=1 $script $meth key1 value1 key2 value2 (only works for fields that are arrays of hashes)\n\n"
+        ."    SHOW_META=1 $script $meth key1 value1 key2 value2 (includes meta information for $meth)\n\n"
         ."Arguments for the hashref should be passed on the commandline as"
         ." simple key value pairs.  If the arguments are more complex, you can"
         ." pass values in any of the ways that L<Data::URIEncode> supports.\n\n"

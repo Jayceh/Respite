@@ -1,13 +1,12 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 use strict;
 use warnings;
 use Test::More qw(no_plan);
-use End;
+use JSON ();
 use Throw qw(throw);
 use Respite::Base;
 use Data::Debug qw(debug);
-use JSON ();
 
 use End;
 use File::Path qw(rmtree);
@@ -65,7 +64,6 @@ $file =~ s|^(?:.+/)?lib/||;
         $self->validate_args($args);
         return {ok => 1};
     }
-
 
     package FooChild;
     sub new { bless $_[1] || {}, $_[0] }
@@ -234,6 +232,8 @@ $test->(@$_) for (
     [val => {_no_trace => 1} => {type => 'validation', error => 'Failed to validate args', errors => {foo => 'foo is required.'}, trace => "Called from Bam::val at $file line $Bam::val_line"}],
     [val => {_no_trace => 1, foo => 2} => {ok => 1}],
     [val => {foo => 2} => {ok => 1}],
+    [my_mod_voom => {} => {VOOM => 1}],
+
     );
 
 ###----------------------------------------------------------------###

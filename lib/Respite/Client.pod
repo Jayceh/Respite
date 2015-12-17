@@ -57,6 +57,15 @@ By default, the results are blessed into the class returned by
 _result_class (default Respite::Client::Result).  If flat is set to true
 it will just return raw data from the request.
 
+If an error is returned and is true, the run_method response will die
+with the value set to the error.
+
+The flat argument is intended to make working with API::Client more seamless
+and close to RPC than the default API::Client behavior of returning
+a response object.
+
+The value can be set per request by passing _flat as an arg to run_method.
+
 =item ns
 
 No default.  If set, the value is added to the beginning of any

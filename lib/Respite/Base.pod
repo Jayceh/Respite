@@ -210,14 +210,6 @@ See L<Respite::Validate>
 Uses Respite::Client to call the emp_auth service and verify a passed
 in token.
 
-=item general_search
-
-Run a general search using GeneralSearch interface.
-
-=item general_search_meta
-
-use markup from general search interface to display meta information.
-
 =item api_preload
 
 Called from Respite::Server when a server is being started.  This

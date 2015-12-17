@@ -89,11 +89,11 @@ sub _remote_call {
     my $name   = $self->service_name;
     my $brand  = $self->api_brand($name);
     my $val    = sub { my ($key, $def) = @_; $self->config($key, $def, $name) };
+    my $no_ssl = $val->(no_ssl => undef);
     my $host   = $val->(host => sub {throw "Missing $name service host",undef,1});
-    my $port   = $val->(port => 443);
+    my $port   = $val->(port => ($no_ssl ? 80 : 443));
     my $path   = $val->(path => sub { $name =~ /^(\w+)_service/ ? $1 : $name });
     my $pass   = $val->(no_sign => undef) ? undef : $val->(pass => undef); # rely on the server to tell us if a password is necessary
-    my $no_ssl = $val->(no_ssl => undef);
     my $utf8   = exists($args->{'_utf8_encoded'}) ? delete($args->{'_utf8_encoded'}) : $val->(utf8_encoded => undef);
     my $enc    = $utf8 && (!ref($utf8) || $utf8->{$method});
     my $retry  = $val->(retry => undef);
@@ -115,12 +115,18 @@ sub _remote_call {
         my $sock;
         my $i = 0;
         while (++$i) {
+            # Note SSL verify may not work as expected on IO::Socket::SSL versions below v1.46
             $sock = $no_ssl ? IO::Socket::INET->new("$host:$port")
-                           : IO::Socket::SSL->new("$host:$port");
+                            : IO::Socket::SSL->new(PeerAddr => $host, PeerPort => $port, SSL_verify_mode => $val->(ssl_verify_mode => 0));
             last if $sock || !$retry || (Time::HiRes::time() - $begin > 3);
             sleep 0.5;
         }
-        throw "Could not connect to $name service", {host => $host, port => $port, url => $url, msg => "$!", detail => "$@", ssl => !$no_ssl, tries => $i} if ! $sock;
+        if (!$sock) {
+            throw "Could not connect to $name service", {
+                host => $host, port => $port, url => $url,
+                msg => (!$no_ssl && ($IO::Socket::SSL::SSL_ERROR || $!)), detail => "$@", ssl => !$no_ssl, tries => $i,
+            };
+        }
 
         my $out = "POST $url HTTP/1.0\r\n${cookie}${sign}Host: $host\r\nContent-length: ".length($req)."\r\nContent-type: application/json\r\n\r\n$req";
         warn "DEBUG_Respite: Connected to http".($no_ssl?'':'s')."://$host:$port/\n$out\n" if $ENV{'DEBUG_Respite'};

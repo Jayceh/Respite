@@ -197,7 +197,7 @@ sub _do_request {
         remote_user => delete($args->{'_w'}),
         remote_ip   => delete($args->{'_i'}),
         token       => delete($args->{'_t'}) || do { my $k = $self->config('admin_cookie_key'); $k ? $self->parse_cookies->{$k} : '' },
-        caller      => $args->{'_c'},
+        caller      => delete($args->{'_c'}),
         dbh_cache   => $self->_dbh_cache,
         transport   => $self->{'transport'},
     });
@@ -310,7 +310,7 @@ sub verify_sig {
             $type = 'signed';
             $sig = $auth;
         } else {
-            $exception = Throw->new("Unknown auth type", {authorization => $auth, uri => $uri, ip => $ip});
+            $exception = Throw->new("Unknown auth type", {authorization => $auth, uri => $uri, ip => $ip, authtype => 'unknown'});
         }
     } else {
         my $allow_md5 = $self->allow_auth_md5_pass($brand);
@@ -318,39 +318,60 @@ sub verify_sig {
         $type = !$sig ? 'none' : ($sig !~ /^[a-f0-z]{32}$/) ? 'signed' : $allow_md5 ? 'md5_pass' : throw 'Auth type md5_pass not allowed';
     }
     my $pass = $self->get_api_pass($brand || '', $ip, $sig, $type, $user, $exception) || [];
-    $pass = [$pass] if ! ref $pass;
-    return {authorization_not_required => 1, ip => $ip, brand => $brand, authtype => $type, exception => $exception} if !@$pass;
+    $pass = ref($pass) ? undef : [$pass] if ref($pass) ne 'ARRAY';
+    return {authorization_not_required => 1, ip => $ip, brand => $brand, authtype => $type, exception => $exception} if $pass && !@$pass;
     die $exception if defined $exception;
     throw "Missing client authorization", {server_name => $self->server_name, ip => $ip, brand => $brand, authtype => $type, uri => $uri} if !$sig && $type && $type ne 'none';
 
-    for my $i (0 .. $#$pass) {
-        next if ($type eq 'basic') ? $pass->[$i] ne $sig
-            : ($type eq 'md5_pass') ? md5_hex($pass->[$i]) ne $sig
-            : ($type eq 'signed') ? do { my ($_sum, $time) = split /:/, $sig, 2; md5_hex("$pass->[$i]:$time:$uri:$req_sum") ne $_sum }
-            : ($type eq 'digest') ? (eval { $self->verify_digest($sig||={}, $pass->[$i], $uri, $req_sum, $meth, $brand, $ip) } ? 0 : do { $sig->{'verify'} = $@; 1 })
-            : 0;
-        return {type => $type, ip => $ip, brand => $brand, meth => $meth, i => $i, ($self->{'verify_sig_return_pass'} ? (pass => $pass->[$i]) : ()), ($type eq 'digest'?(digest=>$sig):())};
+    if ($pass) {
+        for my $i (0 .. $#$pass) {
+            next if ($type eq 'basic') ? $pass->[$i] ne $sig
+                : ($type eq 'md5_pass') ? md5_hex($pass->[$i]) ne $sig
+                : ($type eq 'signed') ? do { my ($_sum, $time) = split /:/, $sig, 2; md5_hex("$pass->[$i]:$time:$uri:$req_sum") ne $_sum }
+                : ($type eq 'digest') ? (eval { $self->verify_digest($sig||={}, $pass->[$i], $uri, $req_sum, $meth, $brand, $ip) } ? 0 : do { $sig->{'verify'} = $@; 1 })
+                : 0;
+            return {authtype => $type, ip => $ip, brand => $brand, meth => $meth, i => $i, ($self->{'verify_sig_return_pass'} ? (pass => $pass->[$i]) : ()), ($type eq 'digest'?(digest=>$sig):())};
+        }
     }
     throw "Invalid client authorization", {($type eq 'digest'?(digest=>$sig):()), server_name => $self->server_name, ip => $ip, brand => $brand, authtype => $type, uri => $uri};
 }
 
+my %cidr;
 sub get_api_pass {
     my ($self, $brand, $ip, $sig, $type, $user, $except) = @_;
     my $ref = $self->config(pass => undef);
-    return $ref if ! ref $ref;
-    if (ref $ref->{$ip}) {
+    return $ref if ! ref($ref) || ref($ref) eq 'ARRAY';
+    if (exists $ref->{$ip}) {
+        return $ref->{$ip} if ref($ref->{$ip}) ne 'HASH';
         return $ref->{$ip}->{$brand} if exists $ref->{$ip}->{$brand};
         return $ref->{$ip}->{'~default~'} if exists $ref->{$ip}->{'~default~'};
-    } elsif (ref $ref->{$brand}) {
+        return $ref->{$ip}->{'-default'} if exists $ref->{$ip}->{'-default'};
+    } elsif (exists $ref->{$brand}) {
+        return $ref->{$brand} if ref($ref->{$brand}) ne 'HASH';
         return $ref->{$brand}->{$ip} if exists $ref->{$brand}->{$ip};
         return $ref->{$brand}->{'~default~'} if exists $ref->{$brand}->{'~default~'};
-    } else {
-        return $ref->{$ip} if exists $ref->{$ip};
-        return $ref->{$brand} if exists $ref->{$brand};
+        return $ref->{$brand}->{'-default'} if exists $ref->{$brand}->{'-default'};
+    } elsif (my $c = $ref->{'~cidr~'} || $ref->{'-cidr'}) {
+        my $n = _aton($ip);
+        foreach my $cidr (keys %$c) {
+            my $range = $cidr{$cidr} ||= _cidr($cidr);
+            next if $n < $range->[0] || $n > $range->[1];
+            my $ref = $c->{$cidr};
+            if (ref($ref) eq 'HASH') {
+                return $ref->{$brand} if exists $ref->{$brand};
+                return $ref->{'~default~'} if exists $ref->{'~default~'};
+                return $ref->{'-default'} if exists $ref->{'-default'};
+            }
+            return $ref;
+        }
     }
+
     return $ref->{'~default~'} if exists $ref->{'~default~'};
+    return $ref->{'-default'} if exists $ref->{'-default'};
     throw "Not authorized - Could not find brand/ip match in pass configuration", {brand => $brand, ip => $ip, service => $self->server_name};
 }
+sub _aton { my $ip  = shift; return unpack "N", pack "C4", split /\./, $ip }
+sub _cidr { (my $c = shift) =~ s/\s+//; my ($ip, $base) = split /\//, $c; my $i = _aton($ip); $i &= 2**32 - 2**(32-$base) if !$_[0]; return [$i, $i+2**(32-$base)-1] }
 
 sub allow_auth_md5_pass { shift->config(allow_auth_md5_pass => undef) }
 sub allow_auth_basic { shift->config(allow_auth_basic => undef) }
@@ -384,6 +405,7 @@ sub server_args {
     my $ssl  = !$val->(no_ssl => undef);
     my $ad   = $val->(auto_doc => ''); $ad = ($name =~ /^(\w+)_server/ ? $1 : $name).'_doc' if $ad && $ad eq '1';
     my $is_dev = eval { defined(&config::is_dev) && config::is_dev() };
+    my $use_dev_port = $is_dev && $ssl && !$val->(no_dev_port => '');
     my $res  = $val->(cgi_bin => undef);
     my $app  = !$res ? \&cgihandler : ($res ne 1) ? $res : 'cgi-bin/'.($name =~ /^(\w+)_server/ ? $1 : $name);
     $app = $self->rootdir_server ."/$app" if !ref($app) && $app !~ /^\//;
@@ -397,20 +419,21 @@ sub server_args {
                  '' => \&http_not_found]],
         port => [
             {port => $port, host => $host, ($ssl ? (proto => 'SSL') : ())},
-            (($is_dev && $ssl) ? {port => ($port == 443 ? 80 : $port-1), host => $host} : ()), # allow for dev to telnet to a non-ssl
+            ($use_dev_port ? {port => ($port == 443 ? 80 : $port-1), host => $host} : ()), # allow for dev to telnet to a non-ssl
         ],
         serialize       => ($is_dev && $ssl) ? 'flock' : 'none', # can only do if hard coded to ipv4 and host resolves to one ip
         access_log_file => $val->(access_log_file => "/var/log/${name}/${name}.access_log"),
         log_file        => $val->(log_file => "/var/log/${name}/${name}.error_log"),
-        pid_file        => $val->(pid_file => "/var/run/${name}/${name}.pid"),
+        pid_file        => $val->(pid_file => "/var/run/${name}.pid"),
         user            => $val->(user     => 'readonly'),
         group           => $val->(group    => 'cvs'),
      };
 }
 
 sub rootdir_server { shift->config(rootdir_server => $config::config{'rootdir_server'} || sub { require FindBin; $FindBin::RealBin }) }
-sub SSL_cert_file { shift->config(ssl_cert => sub { shift->rootdir_server ."/conf/example.com.crt" }) }
-sub SSL_key_file  { shift->config(ssl_key  => sub { shift->rootdir_server ."/conf/example.com.key" }) }
+sub SSL_base_domain { 'example.com' }
+sub SSL_cert_file { shift->config(ssl_cert => sub { shift->rootdir_server .shift->SSL_base_domain().'.crt' }) }
+sub SSL_key_file  { shift->config(ssl_key  => sub { shift->rootdir_server .shift->SSL_base_domain().'.key' }) }
 
 sub post_bind {
     my $self = shift;
@@ -486,15 +509,16 @@ sub _get_pid { # taken from Net::Server::Daemonize::check_pid_file - but modifie
     my $self = shift;
     my $pid_file = $self->{'server'}->{'pid_file'};
     return if ! -e $pid_file; # no pid_file = return success
+    return if -z $pid_file; # empty pid_file = return success
     open my $fh, '<', $pid_file or throw "Could not open existing pid_file", {file => $pid_file, msg => $!};
     my $line = <$fh>;
     close $fh;
-    return ($line =~ /^(\d{1,10})/) ? $1 : throw "Could not find pid in existing pid_file", {line => $line};
+    return ($line =~ /^(\d{1,10})$/) ? $1 : throw "Could not find pid in existing pid_file", {line => $line};
 }
 
 sub _ok {
     my ($ok, $msg) = @_;
-    print STDERR "$msg\e[60G[". ($ok ? "\e[1;32m  OK  " : "\e[1;31mFAILED")  ."\e[0;39m]\n";
+    warn "$msg\e[60G[". ($ok ? "\e[1;32m  OK  " : "\e[1;31mFAILED")  ."\e[0;39m]\n";
 }
 
 sub __status {
@@ -596,6 +620,14 @@ sub __reload {
     }
 }
 
+sub __size_access { shift->__size_error('access_log_file') }
+
+sub __size_error {
+    my ($self, $file) = @_;
+    $file = $self->{'server'}->{$file || 'log_file'} || throw "No log_file to size";
+    return -s $file;
+}
+
 sub __tail_access { shift->__tail_error(shift(), 'access_log_file') }
 
 sub __tail_error {
@@ -610,7 +642,7 @@ sub __tail_error {
 
 sub __ps {
     my $name = shift->server_name;
-    my $out = join '', grep {$_ =~ $name && $_ !~ /\b(?:$$|watch|ps)\b/} `ps fauwx`;
+    my $out = join '', grep {$_ =~ $name && $_ !~ /\b(?:$$|watch|ps)\b/} `ps auwx`;
     warn $out || "No processes found\n";
 }
 
