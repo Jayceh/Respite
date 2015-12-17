@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use Test::More qw(no_plan);
+use Test::Deep;
 use JSON ();
 use Throw qw(throw);
 use Respite::Base;
@@ -290,15 +291,11 @@ nest_a_nest_b_foo
 )], "Correct nested setup");
 
 
-SKIP : {
-    # Call hello method which should be provided in Respite::Base and verify the returned data structure
-    skip "Failed to compilre Test::Deep which will be needed for this test: $@", 1 unless eval { require Test::Deep };
-    my $ip = '127.0.0.1';
-    $obj = Bam->new({api_ip => $ip});
-    $out = eval { $obj->hello } || diag "$@";
-    Test::Deep::cmp_deeply(
-        $out,
-        { api_brand => undef, api_ip => $ip, args => { }, server_time => Test::Deep::ignore() },
-        'Call hello method'
-    );
-}
+my $ip = '127.0.0.1';
+$obj = Bam->new({api_ip => $ip});
+$out = eval { $obj->hello } || diag "$@";
+Test::Deep::cmp_deeply(
+    $out,
+    { api_brand => undef, api_ip => $ip, args => { }, server_time => Test::Deep::ignore() },
+    'Call hello method'
+);
