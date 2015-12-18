@@ -88,6 +88,8 @@ utf8 data, while others do not.
 need to call decode_utf8 to make sure data is ready for the
 transport.)
 
+=back
+
 =head1 PROTOCOL
 
 The Respite::Client service is a JSON over HTTPS service though it does also
