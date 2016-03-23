@@ -24,7 +24,7 @@ $Id: Client.pod,v 1.5 2014/02/26 19:30:38 dfackrell Exp $
 
     debug $client->run_method(foo => {hey => 1});
 
- =head1 OPTIONS
+=head1 OPTIONS
 
 =over 4
 
