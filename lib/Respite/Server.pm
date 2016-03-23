@@ -329,7 +329,7 @@ sub verify_sig {
                 : ($type eq 'md5_pass') ? md5_hex($pass->[$i]) ne $sig
                 : ($type eq 'signed') ? do { my ($_sum, $time) = split /:/, $sig, 2; md5_hex("$pass->[$i]:$time:$uri:$req_sum") ne $_sum }
                 : ($type eq 'digest') ? (eval { $self->verify_digest($sig||={}, $pass->[$i], $uri, $req_sum, $meth, $brand, $ip) } ? 0 : do { $sig->{'verify'} = $@; 1 })
-                : 0;
+                : 1;
             return {authtype => $type, ip => $ip, brand => $brand, meth => $meth, i => $i, ($self->{'verify_sig_return_pass'} ? (pass => $pass->[$i]) : ()), ($type eq 'digest'?(digest=>$sig):())};
         }
     }
