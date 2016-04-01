@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use Test::More;
+use Test::More tests => 12;
 use Sub::Override;
 
 use Respite::Base;   # Loading this here so we can override _configs
@@ -31,14 +31,45 @@ my ($client, $server) = setup_test_server({
     client_utf8_encoded => 1,
     flat => 1,
     no_ssl => 1,
+    # no password
+});
+
+my ($client2, $server2) = setup_test_server({
+    service  => 'bam', # necessary because we directly subclassed Respite::Server
+    api_meta => 'Bam',    # ditto
+    client_utf8_encoded => 1,
+    flat => 1,
+    no_ssl => 1,
+    allow_auth_basic => 1,
+    pass => 'fred',
 });
 
 ok($client, 'Got client');
 ok($server, 'Got server');
+ok($client2, 'Got client2');
+ok($server2, 'Got server2');
 
-my $resp = $client->foo;
-is($resp->{'BAR'}, 1, 'Call api method foo') or diag(explain($resp));
-done_testing(6);
+my $resp = eval {$client->foo };
+is($resp->{'BAR'}, 1, 'Call api method foo, server no pass, client no pass') or diag(explain($resp));
+
+$client->{'pass'} = 'fred';
+$resp = eval {$client->foo };
+is($resp->{'BAR'}, 1, 'Call api method foo, server no pass, client uses pass') or diag(explain($resp));
+
+$resp = eval {$client2->foo };
+my $e = $@;
+warn $e;
+is($resp->{'BAR'}, 1, 'Call api method foo, server uses pass, client uses pass') or diag(explain($resp));
+
+delete $client2->{'pass'};
+$resp = eval {$client2->foo };
+my $e = $@;
+cmp_ok($e, '=~', 'Invalid client auth', 'Call api method foo, server uses pass, client no pass') or diag(explain($resp));
+
+$client2->{'pass'} = 'not correct';
+$resp = eval {$client2->foo };
+my $e = $@;
+cmp_ok($e, '=~', 'Invalid client auth', 'Call api method foo, server uses pass, client bad pass') or diag(explain($resp));
 
 {
     package Bam;
