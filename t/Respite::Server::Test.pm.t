@@ -63,12 +63,12 @@ is($resp->{'BAR'}, 1, 'Call api method foo, server uses pass, client uses pass')
 
 delete $client2->{'pass'};
 $resp = eval {$client2->foo };
-my $e = $@;
+$e = $@;
 cmp_ok($e, '=~', 'Invalid client auth', 'Call api method foo, server uses pass, client no pass') or diag(explain($resp));
 
 $client2->{'pass'} = 'not correct';
 $resp = eval {$client2->foo };
-my $e = $@;
+$e = $@;
 cmp_ok($e, '=~', 'Invalid client auth', 'Call api method foo, server uses pass, client bad pass') or diag(explain($resp));
 
 {
