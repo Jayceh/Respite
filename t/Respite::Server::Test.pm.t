@@ -54,22 +54,22 @@ is($resp->{'BAR'}, 1, 'Call api method foo, server no pass, client no pass') or 
 
 $client->{'pass'} = 'fred';
 $resp = eval {$client->foo };
-is($resp->{'BAR'}, 1, 'Call api method foo, server no pass, client uses pass') or diag(explain($resp));
+my $e = $@;
+is($resp->{'BAR'}, 1, 'Call api method foo, server no pass, client uses pass') or diag(explain([$e,$resp]));
 
 $resp = eval {$client2->foo };
-my $e = $@;
-warn $e;
-is($resp->{'BAR'}, 1, 'Call api method foo, server uses pass, client uses pass') or diag(explain($resp));
+$e = $@;
+is($resp->{'BAR'}, 1, 'Call api method foo, server uses pass, client uses pass') or diag(explain([$e,$resp]));
 
 delete $client2->{'pass'};
 $resp = eval {$client2->foo };
 $e = $@;
-cmp_ok($e, '=~', 'Invalid client auth', 'Call api method foo, server uses pass, client no pass') or diag(explain($resp));
+cmp_ok($e, '=~', 'Invalid client auth', 'Call api method foo, server uses pass, client no pass') or diag(explain([$e,$resp]));
 
 $client2->{'pass'} = 'not correct';
 $resp = eval {$client2->foo };
 $e = $@;
-cmp_ok($e, '=~', 'Invalid client auth', 'Call api method foo, server uses pass, client bad pass') or diag(explain($resp));
+cmp_ok($e, '=~', 'Invalid client auth', 'Call api method foo, server uses pass, client bad pass') or diag(explain([$e,$resp]));
 
 {
     package Bam;
