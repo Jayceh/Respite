@@ -288,14 +288,14 @@ sub _no_brand { shift->config(no_brand => undef) }
 
 sub verify_sig {
     my ($self, $args, $req_sum, $env, $meth, $brand) = @_;
-    my ($ip, $sig, $script, $path_info, $qs, $auth) = @$env{qw(REMOTE_ADDR HTTP_X_Respite_AUTH SCRIPT_NAME PATH_INFO QUERY_STRING HTTP_AUTHORIZATION)};
+    my ($ip, $sig, $script, $path_info, $qs, $auth) = @$env{qw(REMOTE_ADDR HTTP_X_RESPITE_AUTH SCRIPT_NAME PATH_INFO QUERY_STRING HTTP_AUTHORIZATION)};
     my $uri = $script || throw "Missing script";
     $uri .= $path_info if $path_info;
     $uri .= "?$qs" if $qs;
 
     my ($type, $user, $exception);
     if ($auth) {
-        throw "Cannot pass both Authorization and X-Respite-Auth", {authorization => $auth, x_api_auth => $sig, uri => $uri, ip => $ip} if $sig;
+        throw "Cannot pass both Authorization and X-Respite-Auth", {authorization => $auth, x_respite_auth => $sig, uri => $uri, ip => $ip} if $sig;
         if ($auth =~ s/^Basic \s+ (\S+)$/$1/x) {
             $type = 'basic';
             require MIME::Base64;
@@ -314,7 +314,7 @@ sub verify_sig {
         }
     } else {
         my $allow_md5 = $self->allow_auth_md5_pass($brand);
-        $sig ||= $args->{'x_api_auth'} if $allow_md5;
+        $sig ||= $args->{'x_respite_auth'} if $allow_md5;
         $type = !$sig ? 'none' : ($sig !~ /^[a-f0-z]{32}$/) ? 'signed' : $allow_md5 ? 'md5_pass' : throw 'Auth type md5_pass not allowed';
     }
     my $pass = $self->get_api_pass($brand || '', $ip, $sig, $type, $user, $exception) || [];
@@ -329,7 +329,7 @@ sub verify_sig {
                 : ($type eq 'md5_pass') ? md5_hex($pass->[$i]) ne $sig
                 : ($type eq 'signed') ? do { my ($_sum, $time) = split /:/, $sig, 2; md5_hex("$pass->[$i]:$time:$uri:$req_sum") ne $_sum }
                 : ($type eq 'digest') ? (eval { $self->verify_digest($sig||={}, $pass->[$i], $uri, $req_sum, $meth, $brand, $ip) } ? 0 : do { $sig->{'verify'} = $@; 1 })
-                : 0;
+                : 1;
             return {authtype => $type, ip => $ip, brand => $brand, meth => $meth, i => $i, ($self->{'verify_sig_return_pass'} ? (pass => $pass->[$i]) : ()), ($type eq 'digest'?(digest=>$sig):())};
         }
     }
